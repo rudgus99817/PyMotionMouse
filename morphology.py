@@ -19,6 +19,10 @@ if __name__ == "__main__":
     #kernel 사이즈에 따른 차이점
     #test1 = Erode(image,1,kernel)
     #test2 = Erode(image,2,numpy.ones((5,5),numpy.uint8))
+    
+    #erode, dilate의 차이점
+    #test1 = cv2.dilate(test1,kernel)
+    #test2 = cv2.erode(test2,kernel)
     while 1:
         if(cv2.waitKey(1) >= 27):
             break;
