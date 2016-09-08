@@ -16,7 +16,6 @@ while(success):
     #Set start position
     cv2.rectangle(frame,(100,100),(350,350),2)
     part = frame[100:350, 100:350]
-    drawing = np.zeros(part.shape,np.uint8)
 
     #Mask creation, Hand detection by color range
     mask = cv2.inRange(part,low,high)
