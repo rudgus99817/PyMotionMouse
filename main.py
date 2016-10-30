@@ -1,100 +1,79 @@
 import cv2
-import numpy as np
 import Image_process
-import time
+import Mouse_Control
 
 cv2.namedWindow("Window")
 cv2.namedWindow("Histogram")
-process = Image_process.Image_process()
-low = np.array([130,120,0],dtype=np.uint8)
-high = np.array([180,255,255],dtype=np.uint8)
+
+process = Image_process.ImageProcess()
+mouse = Mouse_Control.Control()
+clicked = False
+
+prior = (350, 187)
+current = (350, 187)
+
 #Capture Object Create
 CameraCapture = cv2.VideoCapture(0)
 success = True
+
 #Main logic start
 run = 0
+track_Window = (100, 60, 200, 200)
+term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1)
+
 while(success):
-    success, frame = CameraCapture.read()
+    prior = current
+    success, frame = CameraCapture.read(0)
     frame = process.resize(frame)
-    cv2.GaussianBlur(frame,(3,3),0,frame)
-    if(run<100):
-        run+=1
+    cv2.GaussianBlur(frame, (3, 3), 0, frame)
+
+    if(run < 100):
+        run += 1
         process.Draw_histo_rect(frame)
-        cv2.putText(frame,"front",(0,25),cv2.FONT_HERSHEY_SIMPLEX,1,(255,0,0))
-        cv2.imshow("Histogram",frame)
-        if(cv2.waitKey(60)>=27):
+        cv2.imshow("Histogram", frame)
+        if(cv2.waitKey(60) >= 27):
             break
-        if(run==100):
+
+        if(run == 100):
             process.Build_histogram(frame)
+            dst, mask = process.Apply_histo_mask(frame)
+            ret, track_Window = cv2.meanShift(dst, track_Window, term_crit)
+            x, y, w, h = track_Window
+            cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 3)
+            current = prior = (x, y)
+            mouse.move(prior, current)
         continue
 
-    elif(100<=run<200):
-        run+=1
-        process.Draw_histo_rect(frame)
-        cv2.putText(frame,"back",(0,25),cv2.FONT_HERSHEY_SIMPLEX,1,(255,0,0))
-        cv2.imshow("Histogram",frame)
-        if(cv2.waitKey(60)>=27):
-            break
-        if(run==200):
-            process.Build_histogram(frame)
-        continue
+    dst, mask = process.Apply_histo_mask(frame)
+
+    # Setup the termination criteria, either 10 iteration or e by at least 1 pt
+    ret, track_Window = cv2.meanShift(dst, track_Window, term_crit)
+    x, y, w, h = track_Window
+    current = (x, y)
+    cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 3)
+    mouse.move(prior, current)
+    frame = cv2.bitwise_and(frame, mask)
+
+    part = frame[y:y+3, x:x+w]
+    mask = mask[y:y+3, x:x+w]
+    part = cv2.bitwise_and(part, mask)
+
+    if(part.max() == 0):
+        clicked = True
+    else:
+        clicked = False
 
 
-    histo_mask = process.Apply_histo_mask(frame)
-    cv2.dilate(histo_mask,(3,3),histo_mask)
-    cv2.erode(histo_mask,(3,3),histo_mask)
+    if(mouse.clickstat(clicked)):
+        #num = process.Labeling(part)
+        #print(num)
+        mouse.click()
 
-    x,y,w,h = process.GetROI(histo_mask)
-    cv2.rectangle(frame, (x,y), (x+w,y+h), (255,0,0),3)
-    part = frame[y:y+h, x:x+w]
-    part_mask = histo_mask[y:y+h, x:x+w]
-    target = cv2.inRange(part,low,high)
-    target = cv2.merge((target,target,target))
+    cv2.imshow("Window", frame)
+    cv2.imshow("Histogram", part)
 
-    mask = cv2.bitwise_or(part_mask,target)
-    cut = cv2.bitwise_and(part,part_mask)
-
-    edge = cv2.Canny(histo_mask,100,200)
-    edge, contours, ret = cv2.findContours(edge,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-
-    #Find biggest contour
-    max_area = 0
-    ci = 0
-    find = False
-    for i in range(len(contours)):
-        length = cv2.arcLength(contours[i],False)
-        if(length>700):
-            max_area = length
-            ci = i
-            find = True
-
-    #Find convexhull, defects point and center of mass
-    if(find == True):
-        hull = cv2.convexHull(contours[ci],returnPoints=False)
-        defect = cv2.convexityDefects(contours[ci],hull)
-        #Mass center
-        moment = cv2.moments(contours[ci])
-        cx = int(moment['m10']/moment['m00'])
-        cy = int(moment['m01']/moment['m00'])
-        #Finger find logic(in progress)
-        x,y,w,h = cv2.boundingRect(contours[ci])
-        cv2.rectangle(frame,(x,y),(x+w,y+h),(0,255,255),3)
-        #Draw convexhull
-        for i in range(defect.shape[0]):
-            s,e,f,d = defect[i, 0]
-            d /= 256
-            start = tuple(contours[ci][s][0])
-            end = tuple(contours[ci][e][0])
-            far = tuple(contours[ci][f][0])
-            if(60<d<100):
-                cv2.circle(frame,far,6,(255,0,0),3)
-                cv2.line(frame,start,far,(0,255,0),3)
-                cv2.line(frame,end,far,(0,255,0),3)
-        cv2.drawContours(frame,contours,ci,(0,0,0),3)
-    cv2.imshow("Window",frame)
-    cv2.imshow("Histogram",histo_mask)
-    if(cv2.waitKey(60)>=27):
-        break;
+    if(cv2.waitKey(60) >= 27):
+        break
 
 CameraCapture.release()
 cv2.destroyAllWindows()
