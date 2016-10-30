@@ -1,6 +1,7 @@
-import cv2
-import Image_process
 import Mouse_Control
+import cv2
+
+from src import Image_process
 
 cv2.namedWindow("Window")
 cv2.namedWindow("Histogram")
