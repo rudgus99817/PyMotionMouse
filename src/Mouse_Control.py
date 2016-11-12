@@ -28,3 +28,7 @@ class Control:
 
     def click(self):
         mouse._click(self.current_pos[0], self.current_pos[1], "left")
+
+    def double_click(self):
+        mouse._click(self.current_pos[0], self.current_pos[1], "left")
+        mouse._click(self.current_pos[0], self.current_pos[1], "left")
